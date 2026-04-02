@@ -19,7 +19,7 @@ class _SignupScreenState extends State<SignupScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Registration Successful! Please Login.')),
       );
-      Navigator.pop(context); // يرجع لصفحة الدخول بعد التسجيل
+      Navigator.pop(context); 
     }
   }
 

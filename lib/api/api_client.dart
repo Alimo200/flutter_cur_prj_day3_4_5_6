@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
-
 class ApiClient {
   String baseUrl = "https://dummyjson.com";
   late Dio dio;
@@ -13,17 +12,15 @@ class ApiClient {
         receiveDataWhenStatusError: true,
       ),
     );
-    if (dio.httpClientAdapter is! LogInterceptor) {
-      dio.interceptors.add(PrettyDioLogger(
-        requestHeader: true,
-        requestBody: true,
-        responseBody: true,
-        responseHeader: false,
-        error: true,
-        compact: true,
-        maxWidth: 90,
-      ));
-    }
+    dio.interceptors.add(PrettyDioLogger(
+      requestHeader: true,
+      requestBody: true,
+      responseBody: true,
+      responseHeader: false,
+      error: true,
+      compact: true,
+      maxWidth: 90,
+    ));
   }
 
   Future<Response> getData(String uri) async {
@@ -34,6 +31,7 @@ class ApiClient {
       rethrow;
     }
   }
+
   Future<Response> postData(String uri, Map<String, dynamic> data) async {
     try {
       Response response = await dio.post(uri, data: data);
@@ -42,5 +40,4 @@ class ApiClient {
       rethrow;
     }
   }
-
 }

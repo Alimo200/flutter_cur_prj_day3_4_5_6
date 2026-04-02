@@ -1,7 +1,6 @@
-
-
 import 'package:flutter/material.dart';
-import 'package:flutter_cur_prj_day3_4_5_6/api/api_client.dart';
+import 'package:provider/provider.dart';
+import '../provider/authprovider.dart';
 import 'signup_screen.dart';
 import 'home_screen.dart';
 
@@ -13,35 +12,38 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  ApiClient apiClient = ApiClient();
-
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
   
-  void postdata () async {
-    try {
-      var res = await apiClient.postData('/auth/login ', {"email": _emailController.text, "password": _passwordController.text});
-      if (res.statusCode == 200) {
-        print(res.data);
-      }
-    }
-    catch (e) {
-      print(e);
-    }
-  }
-  
-  void _login() {
+  void _login() async {
     if (_formKey.currentState!.validate()) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      bool success = await authProvider.login(
+        emailController.text, 
+        passwordController.text
       );
+
+      if (success) {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Login Failed. Please check your credentials.")),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isLoading = Provider.of<AuthProvider>(context).isLoading;
+
     return Scaffold(
       body: SingleChildScrollView(
         child: Column(
@@ -77,53 +79,34 @@ class _LoginScreenState extends State<LoginScreen> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    TextFormField(
-                      controller: _emailController,
+                   TextFormField(
+                      controller: emailController,
                       decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.email, color: Colors.deepOrange),
-                        hintText: "Enter Email",
+                        prefixIcon: const Icon(Icons.person, color: Colors.deepOrange),
+                        hintText: "Enter Username", 
                         filled: true,
                         fillColor: Colors.grey[200],
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide.none,
-                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty) return 'Please enter your email';
-                        if (!value.contains('@')) return 'Email must contain @';
-                        return null;
+                         if (value == null || value.isEmpty) return 'Please enter your username';
+                         return null;
                       },
                     ),
                     const SizedBox(height: 20),
                     TextFormField(
-                      controller: _passwordController,
+                      controller: passwordController,
                       obscureText: true,
                       decoration: InputDecoration(
                         prefixIcon: const Icon(Icons.vpn_key, color: Colors.deepOrange),
                         hintText: "Enter Password",
                         filled: true,
                         fillColor: Colors.grey[200],
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide.none,
-                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Please enter your password';
-                        if (value.length < 6) return 'Password must be at least 6 characters';
-                        return null;
-                      },
+                      validator: (value) => value == null || value.length < 6 ? 'Password must be at least 6 characters' : null,
                     ),
-                    const SizedBox(height: 10),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () {},
-                        child: const Text("Forget Password?", style: TextStyle(color: Colors.grey)),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 30),
                     SizedBox(
                       width: double.infinity,
                       height: 50,
@@ -132,8 +115,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           backgroundColor: Colors.deepOrange,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                         ),
-                        onPressed: _login,
-                        child: const Text("LOGIN", style: TextStyle(color: Colors.white, fontSize: 16)),
+                        onPressed: isLoading ? null : _login, 
+                        child: isLoading 
+                          ? const CircularProgressIndicator(color: Colors.white) 
+                          : const Text("LOGIN", style: TextStyle(color: Colors.white, fontSize: 16)),
                       ),
                     ),
                     const SizedBox(height: 20),

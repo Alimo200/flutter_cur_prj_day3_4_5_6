@@ -1,148 +1,148 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../provider/authprovider.dart';
+import '../provider/productprovider.dart';
+import '../provider/cartprovider.dart'; 
+import '../api/api_client.dart'; 
 import 'login_screen.dart';
-import 'package:flutter_cur_prj_day3_4_5_6/api/api_client.dart'; 
+import 'cart_screen.dart'; 
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  ApiClient apiClient = ApiClient();
-  
   int _currentIndex = 0;
-  
-
-  List<String> categories = ["All Products"]; 
-  bool isLoadingCategories = true;
 
   @override
   void initState() {
     super.initState();
-    fetchCategories(); 
-  }
-
-  
-  void fetchCategories() async {
-    try {
-      var res = await apiClient.getData('/products/categories');
-      if (res.statusCode == 200) {
-        List<String> fetchedCategories = [];
-        for (var item in res.data) {
-          if (item is String) {
-            fetchedCategories.add(item);
-          } else if (item is Map) {
-            fetchedCategories.add(item['slug'] ?? item['name'] ?? '');
-          }
-        }
-        setState(() {
-          categories.addAll(fetchedCategories);
-          isLoadingCategories = false;
-        });
-      }
-    } catch (e) {
-      print("Error fetching categories: $e");
-      setState(() {
-        isLoadingCategories = false;
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<ProductProvider>(context, listen: false).fetchCategories();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    
-    return isLoadingCategories
-        ? const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(color: Colors.deepOrange),
-            ),
-          )
-        : DefaultTabController(
-            length: categories.length, 
-            child: Scaffold(
-              appBar: AppBar(
-                title: const Text("Products"),
-                backgroundColor: Colors.deepOrange,
-                foregroundColor: Colors.white,
-                
-                bottom: _currentIndex == 0
-                    ? TabBar(
-                        isScrollable: true,
-                        indicatorColor: Colors.white,
-                        labelColor: Colors.white,
-                        unselectedLabelColor: Colors.white70,
-                        tabs: categories.map((cat) => Tab(text: cat.toUpperCase())).toList(),
-                      )
-                    : null,
-              ),
-              drawer: _buildDrawer(), 
-              body: _currentIndex == 0
-                  ? TabBarView(
-                      children: categories.map((cat) => ProductListTab(category: cat)).toList(),
-                    )
-                  : _currentIndex == 1
-                      ? const Center(child: Text("Search Content Area", style: TextStyle(fontSize: 24)))
-                      : const Center(child: Text("Profile Content Area", style: TextStyle(fontSize: 24))),
-              
-              bottomNavigationBar: BottomNavigationBar(
-                currentIndex: _currentIndex,
-                selectedItemColor: Colors.deepOrange,
-                onTap: (index) {
-                  setState(() {
-                    _currentIndex = index;
-                  });
-                },
-                items: const [
-                  BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-                  BottomNavigationBarItem(icon: Icon(Icons.search), label: "Search"),
-                  BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
-                ],
-              ),
-            ),
+    return Consumer<ProductProvider>(
+      builder: (context, productProvider, child) {
+        if (productProvider.isLoadingCategories) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator(color: Colors.deepOrange)),
           );
+        }
+
+        return DefaultTabController(
+          length: productProvider.categories.length,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text("Products"),
+              backgroundColor: Colors.deepOrange,
+              foregroundColor: Colors.white,
+              actions: [
+                Consumer<CartProvider>(
+                  builder: (context, cartProvider, child) {
+                    return Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.shopping_cart, size: 28),
+                          onPressed: () {
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => const CartScreen()));
+                          },
+                        ),
+                        if (cartProvider.totalCount > 0)
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                '${cartProvider.totalCount}',
+                                style: const TextStyle(color: Colors.deepOrange, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          )
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(width: 10),
+              ],
+              bottom: _currentIndex == 0
+                  ? TabBar(
+                      isScrollable: true,
+                      indicatorColor: Colors.white,
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.white70,
+                      tabs: productProvider.categories.map((cat) => Tab(text: cat.toUpperCase())).toList(),
+                    )
+                  : null,
+            ),
+            drawer: _buildDrawer(context),
+            body: _currentIndex == 0
+                ? TabBarView(
+                    children: productProvider.categories.map((cat) => ProductListTab(category: cat)).toList(),
+                  )
+                : _currentIndex == 1
+                    ? const Center(child: Text("Search Content Area", style: TextStyle(fontSize: 24)))
+                    : const Center(child: Text("Profile Content Area", style: TextStyle(fontSize: 24))),
+            
+            bottomNavigationBar: BottomNavigationBar(
+              currentIndex: _currentIndex,
+              selectedItemColor: Colors.deepOrange,
+              onTap: (index) => setState(() => _currentIndex = index),
+              items: const [
+                BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+                BottomNavigationBarItem(icon: Icon(Icons.search), label: "Search"),
+                BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
-  Widget _buildDrawer() {
+  Widget _buildDrawer(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userEmail = authProvider.userModel?.email ?? "Welcome User!";
+
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          const DrawerHeader(
-            decoration: BoxDecoration(color: Colors.deepOrange),
+          DrawerHeader(
+            decoration: const BoxDecoration(color: Colors.deepOrange),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
+                const CircleAvatar(
                   radius: 30,
                   backgroundColor: Colors.white,
                   child: Icon(Icons.person, size: 30, color: Colors.deepOrange),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Text(
-                  "Welcome User!",
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  userEmail,
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
           ),
           ListTile(
-            leading: const Icon(Icons.person),
-            title: const Text("Profile"),
-            onTap: () {
-              Navigator.pop(context);
-              setState(() => _currentIndex = 2);
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.settings),
-            title: const Text("Settings"),
-            onTap: () => Navigator.pop(context),
-          ),
-          ListTile(
             leading: const Icon(Icons.logout),
             title: const Text("Logout"),
-            onTap: () {
+            onTap: () async {
+              await Provider.of<AuthProvider>(context, listen: false).logout();
+              if (!context.mounted) return;
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -164,8 +164,9 @@ class ProductListTab extends StatefulWidget {
 }
 
 class _ProductListTabState extends State<ProductListTab> {
-  ApiClient apiClient = ApiClient();
+  final ApiClient apiClient = ApiClient();
   List<dynamic> products = [];
+  List<dynamic> filteredProducts = []; 
   bool isLoading = true;
 
   @override
@@ -176,23 +177,36 @@ class _ProductListTabState extends State<ProductListTab> {
 
   void fetchProducts() async {
     try {
-       String endpoint = widget.category == "All Products"
+      String endpoint = widget.category == "All Products"
           ? '/products'
           : '/products/category/${widget.category}';
 
       var res = await apiClient.getData(endpoint);
       if (res.statusCode == 200) {
-        setState(() {
-          products = res.data['products'];
-          isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            products = res.data['products'];
+            filteredProducts = products; 
+            isLoading = false;
+          });
+        }
       }
     } catch (e) {
-      print("Error fetching products for ${widget.category}: $e");
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) setState(() => isLoading = false);
     }
+  }
+
+  void filterSearch(String query) {
+    if (query.isEmpty) {
+      setState(() => filteredProducts = products);
+      return;
+    }
+    setState(() {
+      filteredProducts = products.where((product) {
+        final title = product['title'].toString().toLowerCase();
+        return title.contains(query.toLowerCase());
+      }).toList();
+    });
   }
 
   @override
@@ -204,61 +218,105 @@ class _ProductListTabState extends State<ProductListTab> {
     if (products.isEmpty) {
       return const Center(child: Text("No products found."));
     }
-  
-    
-    return GridView.builder(
-      padding: const EdgeInsets.all(10),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 1, 
-        childAspectRatio: 0.75,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-      ),
-      itemCount: products.length,
-      itemBuilder: (context, index) {
-        var product = products[index];
-        return Card(
-          elevation: 3,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
-                  child: Image.network(
-                    product['thumbnail'], 
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.error),
-                  ),
-                ),
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(10.0),
+          child: TextField(
+            onChanged: filterSearch,
+            decoration: InputDecoration(
+              hintText: "Search in ${widget.category}...",
+              prefixIcon: const Icon(Icons.search, color: Colors.deepOrange),
+              filled: true,
+              fillColor: Colors.grey[200],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30),
+                borderSide: BorderSide.none,
               ),
-              
-              Padding(
-                padding: const EdgeInsets.all(8.0),
+              contentPadding: const EdgeInsets.symmetric(vertical: 0),
+            ),
+          ),
+        ),
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 1, 
+              childAspectRatio: 0.65, 
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+            ),
+            itemCount: filteredProducts.length,
+            itemBuilder: (context, index) {
+              var product = filteredProducts[index];
+              return Card(
+                elevation: 3,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      product['title'],
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                        child: Image.network(
+                          product['thumbnail'], 
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => const Icon(Icons.error),
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 5),
-                    Text(
-                      "\$${product['price']}",
-                      style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold, fontSize: 16),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            product['title'],
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 5),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "\$${product['price']}",
+                                style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                              InkWell(
+                                onTap: () {
+                                  Provider.of<CartProvider>(context, listen: false).addToCart(product);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text("Added to Cart!"),
+                                      duration: Duration(seconds: 1),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.deepOrange,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(Icons.add_shopping_cart, color: Colors.white, size: 18),
+                                ),
+                              )
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ],
+              );
+            },
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 }
